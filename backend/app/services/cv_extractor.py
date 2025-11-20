@@ -14,13 +14,43 @@ class CVExtractor:
         self.email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
         self.phone_pattern = r'(?:\+212|0)[5-7]\d{8}'
         
-        # Mots-clés pour sections
+        # Mots-clés pour sections (français + anglais)
         self.section_keywords = {
-            'experience': ['expérience', 'experience', 'parcours professionnel', 'carrière'],
-            'formation': ['formation', 'études', 'diplôme', 'education', 'scolarité'],
-            'competences': ['compétence', 'compétences', 'skills', 'expertise', 'maîtrise', 'savoir-faire'],
-            'langues': ['langue', 'langues', 'languages'],
-            'contact': ['contact', 'coordonnées', 'informations personnelles']
+            'experience': [
+                # Français
+                'expérience', 'experience', 'expériences', 'experiences',
+                'parcours professionnel', 'carrière', 'historique professionnel',
+                # Anglais
+                'work experience', 'professional experience', 'employment history',
+                'career history', 'work history'
+            ],
+            'formation': [
+                # Français
+                'formation', 'formations', 'études', 'diplôme', 'diplômes', 'scolarité',
+                # Anglais
+                'education', 'academic background', 'qualifications', 'degrees'
+            ],
+            'competences': [
+                # Français
+                'compétence', 'compétences', 'expertise', 'maîtrise', 'savoir-faire',
+                'compétences techniques', 'compétences professionnelles',
+                # Anglais
+                'skills', 'skill', 'technical skills', 'professional skills',
+                'core competencies', 'key skills', 'areas of expertise',
+                'technical competencies', 'soft skills', 'hard skills'
+            ],
+            'langues': [
+                # Français
+                'langue', 'langues',
+                # Anglais
+                'languages', 'language'
+            ],
+            'contact': [
+                # Français
+                'contact', 'coordonnées', 'informations personnelles',
+                # Anglais
+                'contact information', 'personal information', 'contact details'
+            ]
         }
         
     def extract_from_pdf(self, file_path: str) -> Dict:
@@ -242,10 +272,14 @@ class CVExtractor:
             'html', 'css', 'tailwind', 'bootstrap', 'sass', 'less', 'webpack',
             # Méthodologies
             'agile', 'scrum', 'kanban', 'devops',
-            # Compétences RH spécifiques
+            # Compétences RH spécifiques (français)
             'recrutement', 'formation', 'paie', 'sirh', 'droit du travail',
             'gestion des talents', 'onboarding', 'évaluation', 'communication',
             'résolution de conflits', 'négociation', 'leadership', 'coaching',
+            # Compétences RH (anglais)
+            'recruitment', 'recruiting', 'talent management', 'hr management',
+            'payroll', 'compensation', 'benefits', 'employee relations',
+            'performance management', 'training', 'conflict resolution',
             # Outils
             'git', 'jira', 'confluence', 'slack', 'teams', 'excel', 'powerpoint',
             'word', 'office', 'sap', 'workday', 'bamboohr',
@@ -259,11 +293,22 @@ class CVExtractor:
         text_lower = text.lower()
         lines = text.split('\n')
         
-        # Chercher la section "COMPÉTENCES" ou similaire
+        # Chercher la section "COMPÉTENCES" ou "SKILLS" ou similaire
         competences_section = ""
         in_competences = False
-        section_keywords = ['compétence', 'compétences', 'skills', 'expertise', 'maîtrise']
-        stop_keywords = ['expérience', 'formation', 'langue', 'contact', 'éducation']
+        section_keywords = [
+            # Français
+            'compétence', 'compétences', 'expertise', 'maîtrise', 'savoir-faire',
+            # Anglais
+            'skills', 'skill', 'technical skills', 'professional skills',
+            'core competencies', 'key skills', 'competencies'
+        ]
+        stop_keywords = [
+            # Français
+            'expérience', 'formation', 'langue', 'contact', 'éducation', 'études',
+            # Anglais
+            'experience', 'education', 'languages', 'contact', 'work history'
+        ]
         
         for i, line in enumerate(lines):
             line_lower = line.lower().strip()
@@ -296,11 +341,19 @@ class CVExtractor:
         """Extrait les expériences professionnelles"""
         experiences = []
         
-        # Rechercher les sections d'expérience
+        # Rechercher les sections d'expérience (français + anglais)
         experience_patterns = [
+            # Français
             r'expérience professionnelle',
+            r'expériences professionnelles',
             r'experience',
-            r'parcours professionnel'
+            r'experiences',
+            r'parcours professionnel',
+            # Anglais
+            r'work experience',
+            r'professional experience',
+            r'employment history',
+            r'career history'
         ]
         
         text_lower = text.lower()
@@ -316,7 +369,7 @@ class CVExtractor:
                 
                 if dates:
                     experiences.append({
-                        "periode": f"{dates[0]} - {dates[-1] if len(dates) > 1 else 'Présent'}",
+                        "periode": f"{dates[0]} - {dates[-1] if len(dates) > 1 else 'Present'}",
                         "description": section[:200]
                     })
                 break
@@ -327,12 +380,18 @@ class CVExtractor:
         """Extrait la formation"""
         education = []
         
-        # Rechercher les sections de formation
+        # Rechercher les sections de formation (français + anglais)
         education_patterns = [
+            # Français
             r'formation',
+            r'formations',
             r'études',
             r'diplômes',
-            r'education'
+            r'diplôme',
+            # Anglais
+            r'education',
+            r'academic background',
+            r'qualifications'
         ]
         
         text_lower = text.lower()
@@ -341,12 +400,23 @@ class CVExtractor:
                 start_idx = text_lower.find(pattern)
                 section = text[start_idx:start_idx + 400]
                 
-                # Rechercher les diplômes communs
-                diplomas = ['master', 'licence', 'bac', 'ingénieur', 'doctorat', 'dut', 'bts']
-                for diploma in diplomas:
-                    if diploma in text_lower:
+                # Rechercher les diplômes communs (français + anglais)
+                diplomas = {
+                    'master': ['master', "master's", 'msc', 'm.sc'],
+                    'licence': ['licence', 'bachelor', 'bsc', 'b.sc', 'ba'],
+                    'bac': ['baccalauréat', 'bac', 'high school'],
+                    'ingénieur': ['ingénieur', 'engineer', 'engineering degree'],
+                    'doctorat': ['doctorat', 'phd', 'doctorate', 'ph.d'],
+                    'dut': ['dut'],
+                    'bts': ['bts'],
+                    'mba': ['mba'],
+                    'dea': ['dea', 'dess']
+                }
+                
+                for diploma_name, variations in diplomas.items():
+                    if any(var in text_lower for var in variations):
                         education.append({
-                            "diplome": diploma.title(),
+                            "diplome": diploma_name.title(),
                             "description": section[:150]
                         })
                         break
@@ -357,14 +427,26 @@ class CVExtractor:
     def _extract_languages(self, text: str) -> List[str]:
         """Extrait les langues"""
         languages = []
-        common_languages = ['français', 'anglais', 'arabe', 'espagnol', 'allemand']
+        # Langues en français et anglais
+        common_languages = {
+            'français': ['français', 'francais', 'french'],
+            'anglais': ['anglais', 'english'],
+            'arabe': ['arabe', 'arabic'],
+            'espagnol': ['espagnol', 'spanish'],
+            'allemand': ['allemand', 'german'],
+            'italien': ['italien', 'italian'],
+            'portugais': ['portugais', 'portuguese'],
+            'chinois': ['chinois', 'chinese', 'mandarin'],
+            'japonais': ['japonais', 'japanese'],
+            'russe': ['russe', 'russian']
+        }
         
         text_lower = text.lower()
-        for lang in common_languages:
-            if lang in text_lower:
-                languages.append(lang.title())
+        for lang_fr, variations in common_languages.items():
+            if any(var in text_lower for var in variations):
+                languages.append(lang_fr.title())
         
-        return languages
+        return list(set(languages))  # Éviter les doublons
     
     def _create_empty_result(self) -> Dict:
         """Crée un résultat vide en cas d'erreur"""
