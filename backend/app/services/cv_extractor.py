@@ -14,6 +14,15 @@ class CVExtractor:
         self.email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
         self.phone_pattern = r'(?:\+212|0)[5-7]\d{8}'
         
+        # Mots-clés pour sections
+        self.section_keywords = {
+            'experience': ['expérience', 'experience', 'parcours professionnel', 'carrière'],
+            'formation': ['formation', 'études', 'diplôme', 'education', 'scolarité'],
+            'competences': ['compétence', 'compétences', 'skills', 'expertise', 'maîtrise', 'savoir-faire'],
+            'langues': ['langue', 'langues', 'languages'],
+            'contact': ['contact', 'coordonnées', 'informations personnelles']
+        }
+        
     def extract_from_pdf(self, file_path: str) -> Dict:
         """Extrait le texte et les informations d'un PDF"""
         text = ""
@@ -41,8 +50,14 @@ class CVExtractor:
     
     def _parse_cv_text(self, text: str) -> Dict:
         """Parse le texte du CV pour extraire les informations structurées"""
+        # Identifier les sections du CV
+        sections = self._identify_sections(text)
+        
+        # Extraire le header (premières lignes avant les sections)
+        header = sections.get('header', text[:500])
+        
         result = {
-            "nom_complet": self._extract_name(text),
+            "nom_complet": self._extract_name_from_header(header, text),
             "email": self._extract_email(text),
             "telephone": self._extract_phone(text),
             "ville": self._extract_city(text),
@@ -54,18 +69,101 @@ class CVExtractor:
         }
         return result
     
+    def _extract_name_from_header(self, header: str, full_text: str) -> Optional[str]:
+        """Extrait le nom depuis le header du CV"""
+        lines = header.strip().split('\n')
+        lines = [l.strip() for l in lines if l.strip()]
+        
+        if not lines:
+            return self._extract_name(full_text)
+        
+        # Stratégie: Le nom est souvent la première ou deuxième ligne significative
+        for i, line in enumerate(lines[:5]):
+            words = line.split()
+            
+            # Ignorer les lignes avec email, téléphone ou URLs
+            if any(char in line for char in ['@', 'http', 'www']):
+                continue
+            
+            # Ignorer les lignes avec des chiffres (probablement téléphone ou date)
+            if re.search(r'\d{4,}', line):
+                continue
+            
+            # Le nom: 2-4 mots, pas trop long
+            if 2 <= len(words) <= 4 and 5 <= len(line) <= 50:
+                # Tous les mots commencent par une majuscule ou tout en majuscules
+                if line.isupper():
+                    return ' '.join([w.capitalize() for w in words])
+                elif all(w[0].isupper() for w in words if w and w[0].isalpha()):
+                    return line
+        
+        # Fallback à l'ancienne méthode
+        return self._extract_name(full_text)
+    
+    def _identify_sections(self, text: str) -> Dict[str, str]:
+        """Identifie les différentes sections du CV"""
+        sections = {}
+        lines = text.split('\n')
+        current_section = 'header'
+        section_content = []
+        
+        for line in lines:
+            line_lower = line.lower().strip()
+            
+            # Vérifier si c'est un titre de section
+            is_section_title = False
+            for section_type, keywords in self.section_keywords.items():
+                if any(keyword in line_lower for keyword in keywords):
+                    # Sauvegarder la section précédente
+                    if section_content:
+                        sections[current_section] = '\n'.join(section_content)
+                    
+                    # Commencer une nouvelle section
+                    current_section = section_type
+                    section_content = []
+                    is_section_title = True
+                    break
+            
+            if not is_section_title and line.strip():
+                section_content.append(line)
+        
+        # Sauvegarder la dernière section
+        if section_content:
+            sections[current_section] = '\n'.join(section_content)
+        
+        return sections
+    
     def _extract_name(self, text: str) -> Optional[str]:
         """Extrait le nom (généralement dans les premières lignes)"""
         lines = text.strip().split('\n')
-        # Le nom est souvent dans les 3 premières lignes en majuscules
-        for line in lines[:5]:
-            line = line.strip()
-            if len(line) > 0 and len(line) < 50:
-                # Si la ligne contient surtout des majuscules et des espaces
-                if line.isupper() or len(line.split()) <= 3:
-                    # Vérifier que ce n'est pas un email ou téléphone
-                    if not re.search(self.email_pattern, line) and not re.search(self.phone_pattern, line):
-                        return line.title()
+        
+        # Nettoyer les lignes vides
+        lines = [l.strip() for l in lines if l.strip()]
+        
+        # Stratégie 1: Chercher dans les 10 premières lignes
+        for i, line in enumerate(lines[:10]):
+            # Le nom est souvent composé de 2-4 mots
+            words = line.split()
+            if 2 <= len(words) <= 4 and len(line) < 50:
+                # Vérifier que ce n'est pas un email, téléphone ou URL
+                if (not re.search(self.email_pattern, line) and 
+                    not re.search(self.phone_pattern, line) and
+                    not 'http' in line.lower() and
+                    not '@' in line):
+                    
+                    # Si ligne en majuscules et ressemble à un nom
+                    if line.isupper():
+                        return ' '.join([w.capitalize() for w in words])
+                    
+                    # Si la première ligne non vide ressemble à un nom (commence par majuscule)
+                    if i < 3 and all(w[0].isupper() for w in words if w):
+                        # Pas un titre de section commun
+                        lower_line = line.lower()
+                        if not any(keyword in lower_line for keyword in 
+                                 ['expérience', 'formation', 'compétence', 'contact', 
+                                  'objectif', 'profil', 'curriculum']):
+                            return line
+        
         return None
     
     def _extract_email(self, text: str) -> Optional[str]:
@@ -75,48 +173,124 @@ class CVExtractor:
     
     def _extract_phone(self, text: str) -> Optional[str]:
         """Extrait le numéro de téléphone"""
-        phones = re.findall(self.phone_pattern, text)
-        if phones:
-            phone = phones[0]
-            # Normaliser le format
-            phone = re.sub(r'\s+', '', phone)
-            if phone.startswith('0'):
-                phone = '+212' + phone[1:]
-            return phone
+        # Patterns pour téléphones marocains
+        patterns = [
+            r'\+212[\s-]?[5-7][\s-]?\d{2}[\s-]?\d{2}[\s-]?\d{2}[\s-]?\d{2}',  # +212 6 XX XX XX XX
+            r'0[5-7][\s-]?\d{2}[\s-]?\d{2}[\s-]?\d{2}[\s-]?\d{2}',  # 06 XX XX XX XX
+            r'\+212[\s-]?\d{9}',  # +212XXXXXXXXX
+            r'0[5-7]\d{8}',  # 06XXXXXXXX
+        ]
+        
+        for pattern in patterns:
+            phones = re.findall(pattern, text)
+            if phones:
+                phone = phones[0]
+                # Nettoyer et normaliser
+                phone = re.sub(r'[-\s]', '', phone)
+                if phone.startswith('0'):
+                    phone = '+212' + phone[1:]
+                elif not phone.startswith('+'):
+                    phone = '+212' + phone
+                return phone
+        
         return None
     
     def _extract_city(self, text: str) -> Optional[str]:
         """Extrait la ville"""
         moroccan_cities = [
-            'Casablanca', 'Rabat', 'Marrakech', 'Fès', 'Tanger', 'Agadir',
-            'Meknès', 'Oujda', 'Kenitra', 'Tétouan', 'Salé', 'Mohammedia',
-            'El Jadida', 'Khouribga', 'Beni Mellal', 'Nador'
+            'Casablanca', 'Rabat', 'Marrakech', 'Fès', 'Fes', 'Tanger', 'Agadir',
+            'Meknès', 'Meknes', 'Oujda', 'Kenitra', 'Kénitra', 'Tétouan', 'Tetouan',
+            'Salé', 'Sale', 'Mohammedia', 'El Jadida', 'Khouribga', 'Beni Mellal',
+            'Nador', 'Settat', 'Safi', 'Essaouira', 'Larache', 'Khemisset'
         ]
         
         text_lower = text.lower()
+        lines = text.split('\n')
+        
+        # Chercher dans les 15 premières lignes (section contact/header)
+        for line in lines[:15]:
+            line_lower = line.lower().strip()
+            for city in moroccan_cities:
+                if city.lower() in line_lower:
+                    # Vérifier que c'est bien la ville et pas dans un contexte différent
+                    if len(line.split()) <= 10:  # Ligne courte, probablement contact
+                        return city
+        
+        # Chercher dans tout le texte si pas trouvé
         for city in moroccan_cities:
             if city.lower() in text_lower:
                 return city
+        
         return None
     
     def _extract_skills(self, text: str) -> List[str]:
         """Extrait les compétences techniques"""
         skills_keywords = [
-            'python', 'java', 'javascript', 'typescript', 'react', 'angular', 'vue',
-            'node.js', 'django', 'flask', 'fastapi', 'sql', 'postgresql', 'mysql',
-            'mongodb', 'docker', 'kubernetes', 'aws', 'azure', 'gcp', 'git',
-            'html', 'css', 'tailwind', 'bootstrap', 'agile', 'scrum', 'api',
-            'rest', 'graphql', 'machine learning', 'data science', 'ai'
+            # Langages de programmation
+            'python', 'java', 'javascript', 'typescript', 'c++', 'c#', 'php', 'ruby',
+            'go', 'rust', 'swift', 'kotlin', 'scala', 'r', 'matlab',
+            # Frameworks & Libraries
+            'react', 'angular', 'vue', 'node.js', 'django', 'flask', 'fastapi',
+            'spring', 'laravel', 'express', 'next.js', 'nuxt',
+            # Bases de données
+            'sql', 'postgresql', 'mysql', 'mongodb', 'redis', 'oracle', 'sqlserver',
+            'cassandra', 'elasticsearch',
+            # DevOps & Cloud
+            'docker', 'kubernetes', 'aws', 'azure', 'gcp', 'jenkins', 'gitlab', 'github',
+            'terraform', 'ansible', 'ci/cd',
+            # Web
+            'html', 'css', 'tailwind', 'bootstrap', 'sass', 'less', 'webpack',
+            # Méthodologies
+            'agile', 'scrum', 'kanban', 'devops',
+            # Compétences RH spécifiques
+            'recrutement', 'formation', 'paie', 'sirh', 'droit du travail',
+            'gestion des talents', 'onboarding', 'évaluation', 'communication',
+            'résolution de conflits', 'négociation', 'leadership', 'coaching',
+            # Outils
+            'git', 'jira', 'confluence', 'slack', 'teams', 'excel', 'powerpoint',
+            'word', 'office', 'sap', 'workday', 'bamboohr',
+            # Autres
+            'api', 'rest', 'graphql', 'microservices', 'machine learning', 
+            'data science', 'ai', 'intelligence artificielle', 'big data',
+            'analytics', 'bi', 'power bi', 'tableau'
         ]
         
         found_skills = []
         text_lower = text.lower()
+        lines = text.split('\n')
         
+        # Chercher la section "COMPÉTENCES" ou similaire
+        competences_section = ""
+        in_competences = False
+        section_keywords = ['compétence', 'compétences', 'skills', 'expertise', 'maîtrise']
+        stop_keywords = ['expérience', 'formation', 'langue', 'contact', 'éducation']
+        
+        for i, line in enumerate(lines):
+            line_lower = line.lower().strip()
+            
+            # Détecter le début de la section compétences
+            if any(keyword in line_lower for keyword in section_keywords):
+                in_competences = True
+                continue
+            
+            # Détecter la fin de la section
+            if in_competences and any(keyword in line_lower for keyword in stop_keywords):
+                break
+            
+            # Collecter les lignes de la section compétences
+            if in_competences and line.strip():
+                competences_section += " " + line
+        
+        # Si on a trouvé une section compétences, chercher dedans en priorité
+        search_text = competences_section if competences_section else text_lower
+        
+        # Extraire les compétences connues
         for skill in skills_keywords:
-            if skill in text_lower:
-                found_skills.append(skill.title())
+            if skill in search_text:
+                found_skills.append(skill.capitalize())
         
-        return list(set(found_skills))  # Remove duplicates
+        # Nettoyer et retourner sans doublons
+        return list(set(found_skills))
     
     def _extract_experience(self, text: str) -> List[Dict]:
         """Extrait les expériences professionnelles"""
