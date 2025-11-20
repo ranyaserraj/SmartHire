@@ -9,6 +9,38 @@ class CVUpload(BaseModel):
     type_fichier: str
 
 
+class CVExtractedData(BaseModel):
+    """Données extraites du CV à vérifier par l'utilisateur"""
+    nom_complet: Optional[str] = None
+    email: Optional[str] = None
+    telephone: Optional[str] = None
+    ville: Optional[str] = None
+    competences: List[str] = []
+    experience: List[Dict[str, Any]] = []
+    formation: List[Dict[str, Any]] = []
+    langues: List[str] = []
+    contenu_texte: str = ""
+
+
+class CVUploadResponse(BaseModel):
+    """Réponse après upload du CV avec données extraites"""
+    id: int
+    extracted_data: CVExtractedData
+    
+    class Config:
+        from_attributes = True
+
+
+class CVUpdateData(BaseModel):
+    """Données vérifiées et corrigées par l'utilisateur"""
+    cv_id: int
+    nom_complet: Optional[str] = None
+    email_cv: Optional[str] = None
+    telephone_cv: Optional[str] = None
+    ville: Optional[str] = None
+    competences_extraites: List[str] = []
+
+
 class CVResponse(BaseModel):
     id: int
     user_id: int

@@ -18,6 +18,8 @@ pydantic-settings==2.1.0
 
 # File handling
 pillow==10.1.0
+PyPDF2==3.0.1
+pytesseract==0.3.10
 
 # Scraping
 beautifulsoup4==4.12.2

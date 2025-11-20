@@ -16,6 +16,7 @@ class CV(Base):
     nom_complet = Column(String(200), nullable=True)
     email_cv = Column(String(255), nullable=True)
     telephone_cv = Column(String(20), nullable=True)
+    ville = Column(String(100), nullable=True)
     competences_extraites = Column(JSONB, nullable=True)
     date_upload = Column(DateTime, server_default=func.now())
     created_at = Column(DateTime, server_default=func.now())

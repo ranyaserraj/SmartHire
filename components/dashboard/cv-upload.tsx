@@ -2,16 +2,17 @@
 
 import type React from "react"
 
-import { Upload } from "lucide-react"
+import { Upload, Loader2 } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { useRef } from "react"
 
 interface CVUploadSectionProps {
   uploadedCV: File | null
   onUpload: (file: File) => void
+  isUploading?: boolean
 }
 
-export default function CVUploadSection({ uploadedCV, onUpload }: CVUploadSectionProps) {
+export default function CVUploadSection({ uploadedCV, onUpload, isUploading = false }: CVUploadSectionProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -45,16 +46,35 @@ export default function CVUploadSection({ uploadedCV, onUpload }: CVUploadSectio
       <div
         onDragOver={handleDragOver}
         onDrop={handleDrop}
-        className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary/50 transition-colors cursor-pointer"
-        onClick={() => fileInputRef.current?.click()}
+        className={`border-2 border-dashed border-border rounded-lg p-8 text-center transition-colors ${
+          isUploading ? "opacity-50 cursor-not-allowed" : "hover:border-primary/50 cursor-pointer"
+        }`}
+        onClick={() => !isUploading && fileInputRef.current?.click()}
       >
-        <input ref={fileInputRef} type="file" accept=".pdf,image/*" onChange={handleFileSelect} className="hidden" />
+        <input 
+          ref={fileInputRef} 
+          type="file" 
+          accept=".pdf,image/*" 
+          onChange={handleFileSelect} 
+          className="hidden"
+          disabled={isUploading}
+        />
 
-        <Upload className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
-        <p className="text-foreground font-medium mb-1">Déposez votre CV ici</p>
-        <p className="text-sm text-muted-foreground">ou cliquez pour sélectionner (PDF ou Image)</p>
+        {isUploading ? (
+          <>
+            <Loader2 className="w-12 h-12 text-primary mx-auto mb-3 animate-spin" />
+            <p className="text-foreground font-medium mb-1">Extraction des données en cours...</p>
+            <p className="text-sm text-muted-foreground">Veuillez patienter</p>
+          </>
+        ) : (
+          <>
+            <Upload className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+            <p className="text-foreground font-medium mb-1">Déposez votre CV ici</p>
+            <p className="text-sm text-muted-foreground">ou cliquez pour sélectionner (PDF ou Image)</p>
+          </>
+        )}
 
-        {uploadedCV && (
+        {uploadedCV && !isUploading && (
           <div className="mt-4 p-3 bg-primary/10 rounded-lg">
             <p className="text-sm text-primary font-medium">{uploadedCV.name}</p>
           </div>
