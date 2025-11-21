@@ -363,7 +363,7 @@ class CVExtractorV2:
             
             # Fuzzy match (score > 85)
             matches = process.extract(skill, search_text.split(), scorer=fuzz.ratio, limit=3)
-            for match, score in matches:
+            for match, score, index in matches:
                 if score > 85:
                     skills_found.add(skill.title())
                     break
