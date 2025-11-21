@@ -9,7 +9,7 @@ from ..models.cv import CV
 from ..schemas.cv import CVResponse, CVUploadResponse, CVExtractedData, CVUpdateData
 from ..core.deps import get_current_user
 from ..config import settings
-from ..services.cv_extractor import CVExtractor
+from ..services.cv_extractor_v2 import CVExtractorV2
 
 router = APIRouter(prefix="/api/cvs", tags=["CVs"])
 
@@ -57,12 +57,22 @@ async def upload_cv(
     with open(file_path, "wb") as f:
         f.write(contents)
     
-    # Extract data from CV
-    extractor = CVExtractor()
-    if type_fichier == "pdf":
-        extracted_data = extractor.extract_from_pdf(file_path)
-    else:
-        extracted_data = extractor.extract_from_image(file_path)
+    # Extract data from CV using V2 extractor (robust)
+    extractor = CVExtractorV2()
+    extracted_raw = extractor.extract_from_file(file_path)
+    
+    # Map to expected format for database and response
+    extracted_data = {
+        "nom_complet": extracted_raw.get("nom", ""),
+        "email": extracted_raw.get("email", ""),
+        "telephone": extracted_raw.get("telephone", ""),
+        "ville": extracted_raw.get("ville", ""),
+        "competences": extracted_raw.get("competences_extraites", []),
+        "experience": extracted_raw.get("experience", []),
+        "formation": extracted_raw.get("formation", []),
+        "langues": extracted_raw.get("langues", []),
+        "contenu_texte": ""  # Will be populated if needed
+    }
     
     # Create CV entry in database with temporary data
     new_cv = CV(
