@@ -30,5 +30,8 @@ beautifulsoup4==4.12.2
 requests==2.31.0
 fake-useragent==1.4.0
 
+# Translation
+deep-translator==1.11.4
+
 # Utils
 python-dotenv==1.0.0
