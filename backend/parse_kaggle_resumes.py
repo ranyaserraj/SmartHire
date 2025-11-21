@@ -2,6 +2,13 @@
 Parser pour le dataset Kaggle UpdatedResumeDataSet.csv
 Extrait toutes les compétences uniques des CV réels
 """
+import sys
+import io
+# Fix encoding for Windows console
+if sys.platform == 'win32':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+
 import pandas as pd
 import json
 import re
