@@ -1,9 +1,9 @@
 """
 Service d'extraction de données de CV - VERSION 3 AVANCÉE
-Intègre ESCO + toutes les améliorations suggérées
+Dataset multi-domaines avec 2795 compétences
 
 Améliorations V3:
-- API ESCO (13 000+ compétences)
+- Dataset 9544 CV réels (tous secteurs)
 - Tri spatial des blocs (x, y) pour CV en colonnes
 - Fuzzy matching pour détection de sections
 - Dates avec tous séparateurs (→, –, >, etc.)
@@ -14,8 +14,15 @@ Améliorations V3:
 - Langues avec niveaux CEFR
 - Soft skills automatiques
 """
+import sys
+import io as io_module
+
+# Fix encoding for Windows console
+if sys.platform == 'win32':
+    sys.stdout = io_module.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stderr = io_module.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+
 import re
-import io
 import json
 from typing import Dict, List, Optional, Tuple, Set
 from datetime import datetime
@@ -31,18 +38,18 @@ import pytesseract
 from rapidfuzz import fuzz, process
 from dateutil import parser as date_parser
 
-# ESCO integration
-from .esco_loader import get_esco_loader
+# Skills loader
+from .skills_loader import get_skills_loader
 
 
 class CVExtractorV3:
-    """Extracteur de CV V3 avec ESCO et améliorations avancées"""
+    """Extracteur de CV V3 avec dataset multi-domaines français"""
     
     def __init__(self):
         print("🚀 Initialisation CV Extractor V3...")
         
-        # Charger ESCO
-        self.esco = get_esco_loader()
+        # Charger le dataset de compétences
+        self.skills_loader = get_skills_loader()
         
         # Patterns de dates ÉTENDUS (tous séparateurs)
         self.date_patterns = self._init_date_patterns()
@@ -62,8 +69,8 @@ class CVExtractorV3:
                                 'beginner', 'intermediate', 'advanced', 'fluent', 'native']
         
         print("✅ CV Extractor V3 prêt")
-        stats = self.esco.get_stats()
-        print(f"   📊 ESCO: {stats['total_skills']} compétences chargées")
+        stats = self.skills_loader.get_stats()
+        print(f"   📊 Dataset: {stats['total_skills']} compétences chargées")
     
     def _init_date_patterns(self) -> List[str]:
         """Patterns de dates multi-format avec TOUS les séparateurs"""
@@ -254,7 +261,7 @@ class CVExtractorV3:
         # AMÉLIORATION: Détection sections avec fuzzy matching
         sections = self._detect_sections_fuzzy(lines)
         
-        # AMÉLIORATION: Extraction avec ESCO
+        # AMÉLIORATION: Extraction avec dataset multi-domaines
         competences_data = self._extract_skills_esco(
             text, 
             sections.get('competences', [])

@@ -1,21 +1,20 @@
 """
-Module pour charger et interroger le référentiel ESCO
-ESCO = European Skills, Competences, Qualifications and Occupations
+Module pour charger et interroger le référentiel de compétences
+Dataset: 2795 compétences de 9544 CV réels (tous secteurs)
 """
 import json
-import csv
 from pathlib import Path
 from typing import List, Dict, Set, Optional
 from rapidfuzz import fuzz, process
 import re
 
 
-class ESCOLoader:
+class SkillsLoader:
     """
-    Charge et interroge le référentiel ESCO des compétences
+    Charge et interroge le référentiel de compétences françaises
     
-    Dataset ESCO officiel : 13 000+ compétences en 28 langues
-    Source : https://esco.ec.europa.eu/en/use-esco/download
+    Dataset: 2795 compétences de 9544 CV réels
+    Source: Kaggle resume_data.csv (multi-domaines)
     """
     
     def __init__(self):
@@ -23,12 +22,11 @@ class ESCOLoader:
         self.technical_skills = set()
         self.soft_skills = set()
         self.all_skills = set()
-        self.skills_by_language = {}
         
         # Charger les compétences
-        self._load_esco_data()
+        self._load_skills_data()
     
-    def _load_esco_data(self):
+    def _load_skills_data(self):
         """Charge les données depuis le fichier local"""
         # Chemin vers les données
         data_dir = Path(__file__).parent.parent.parent / "data"
@@ -62,51 +60,8 @@ class ESCOLoader:
             print()
             self._load_default_skills()
     
-    def _load_from_csv(self, csv_path: Path):
-        """Charge les compétences depuis le CSV ESCO complet"""
-        try:
-            with open(csv_path, 'r', encoding='utf-8') as f:
-                reader = csv.DictReader(f)
-                count = 0
-                
-                for row in reader:
-                    # Structure du CSV ESCO :
-                    # conceptUri, preferredLabel, altLabels, skillType, ...
-                    
-                    skill_name = row.get('preferredLabel', '').strip()
-                    skill_type = row.get('skillType', '').lower()
-                    language = row.get('language', 'en').lower()
-                    
-                    if not skill_name:
-                        continue
-                    
-                    # Ajouter la compétence
-                    self.all_skills.add(skill_name)
-                    
-                    # Classifier selon le type
-                    if 'soft' in skill_type or 'transversal' in skill_type:
-                        self.soft_skills.add(skill_name)
-                    else:
-                        self.technical_skills.add(skill_name)
-                    
-                    # Indexer par langue
-                    if language not in self.skills_by_language:
-                        self.skills_by_language[language] = set()
-                    self.skills_by_language[language].add(skill_name)
-                    
-                    count += 1
-                
-                print(f"✅ {count} compétences ESCO chargées")
-                print(f"   - Techniques: {len(self.technical_skills)}")
-                print(f"   - Soft skills: {len(self.soft_skills)}")
-                print(f"   - Langues: {len(self.skills_by_language)}")
-        
-        except Exception as e:
-            print(f"❌ Erreur lors du chargement CSV ESCO: {e}")
-            self._load_default_skills()
-    
     def _load_from_json(self, json_path: Path):
-        """Charge les compétences depuis le JSON d'échantillon"""
+        """Charge les compétences depuis le JSON"""
         try:
             with open(json_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
@@ -115,7 +70,7 @@ class ESCOLoader:
             self.soft_skills = set(data.get('soft_skills', []))
             self.all_skills = self.technical_skills | self.soft_skills
             
-            print(f"✅ {len(self.all_skills)} compétences chargées (échantillon)")
+            print(f"✅ {len(self.all_skills)} compétences chargées")
             print(f"   - Techniques: {len(self.technical_skills)}")
             print(f"   - Soft skills: {len(self.soft_skills)}")
         
@@ -189,11 +144,6 @@ class ESCOLoader:
             'soft': sorted(list(found_skills['soft']))
         }
     
-    def get_skill_variations(self, skill: str) -> List[str]:
-        """Retourne les variations d'une compétence (synonymes, traductions)"""
-        # TODO: Implémenter avec les altLabels du CSV ESCO
-        return [skill]
-    
     def is_technical_skill(self, skill: str) -> bool:
         """Vérifie si une compétence est technique"""
         return skill in self.technical_skills
@@ -202,30 +152,26 @@ class ESCOLoader:
         """Vérifie si une compétence est une soft skill"""
         return skill in self.soft_skills
     
-    def get_all_skills(self, language: Optional[str] = None) -> List[str]:
-        """Retourne toutes les compétences, optionnellement filtrées par langue"""
-        if language and language in self.skills_by_language:
-            return sorted(list(self.skills_by_language[language]))
+    def get_all_skills(self) -> List[str]:
+        """Retourne toutes les compétences"""
         return sorted(list(self.all_skills))
     
     def get_stats(self) -> Dict:
-        """Retourne les statistiques du dataset ESCO chargé"""
+        """Retourne les statistiques du dataset chargé"""
         return {
             'total_skills': len(self.all_skills),
             'technical_skills': len(self.technical_skills),
-            'soft_skills': len(self.soft_skills),
-            'languages': list(self.skills_by_language.keys()),
-            'languages_count': len(self.skills_by_language)
+            'soft_skills': len(self.soft_skills)
         }
 
 
 # Instance globale (singleton)
-_esco_loader = None
+_skills_loader = None
 
-def get_esco_loader() -> ESCOLoader:
-    """Retourne l'instance globale du loader ESCO (singleton)"""
-    global _esco_loader
-    if _esco_loader is None:
-        _esco_loader = ESCOLoader()
-    return _esco_loader
+def get_skills_loader() -> SkillsLoader:
+    """Retourne l'instance globale du loader (singleton)"""
+    global _skills_loader
+    if _skills_loader is None:
+        _skills_loader = SkillsLoader()
+    return _skills_loader
 
