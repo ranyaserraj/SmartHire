@@ -30,25 +30,60 @@ class ESCOLoader:
     
     def _load_esco_data(self):
         """Charge les données ESCO depuis le fichier local"""
-        # Chemin vers les données ESCO
+        # Chemin vers les données
         data_dir = Path(__file__).parent.parent.parent / "data"
         
-        # Essayer de charger le dataset complet
-        full_dataset = data_dir / "esco_skills_full.csv"
-        sample_dataset = data_dir / "esco_skills_sample.json"
+        # Ordre de priorité des datasets
+        kaggle_dataset = data_dir / "kaggle_skills.json"
+        esco_complete = data_dir / "esco_skills_complete.json"
+        esco_extended = data_dir / "esco_skills_extended.json"
+        esco_full_csv = data_dir / "esco_skills_full.csv"
+        esco_full_json = data_dir / "esco_skills_full.json"
+        esco_sample = data_dir / "esco_skills_sample.json"
         
-        if full_dataset.exists():
+        # 1. Priorité: Dataset Kaggle (CV réels)
+        if kaggle_dataset.exists():
+            print("🎯 Chargement du dataset Kaggle (CV réels)...")
+            self._load_from_json(kaggle_dataset)
+        
+        # 2. Dataset ESCO complet fusionné
+        elif esco_complete.exists():
             print("📚 Chargement du dataset ESCO complet...")
-            self._load_from_csv(full_dataset)
-        elif sample_dataset.exists():
-            print("⚠️ Utilisation du dataset ESCO d'échantillon (limité)")
-            print("   Pour le dataset complet (13 000+ skills):")
-            print("   1. Téléchargez depuis: https://esco.ec.europa.eu/en/use-esco/download")
-            print("   2. Placez le fichier CSV dans: backend/data/esco_skills_full.csv")
-            self._load_from_json(sample_dataset)
+            self._load_from_json(esco_complete)
+        
+        # 3. Dataset étendu avec compétences populaires
+        elif esco_extended.exists():
+            print("📚 Chargement du dataset étendu...")
+            self._load_from_json(esco_extended)
+        
+        # 4. CSV ESCO officiel
+        elif esco_full_csv.exists():
+            print("📚 Chargement du CSV ESCO...")
+            self._load_from_csv(esco_full_csv)
+        
+        # 5. JSON ESCO parsé
+        elif esco_full_json.exists():
+            print("📚 Chargement du JSON ESCO...")
+            self._load_from_json(esco_full_json)
+        
+        # 6. Échantillon (fallback)
+        elif esco_sample.exists():
+            print("⚠️ Utilisation du dataset d'échantillon (limité à 139 compétences)")
+            print("   📥 Pour améliorer:")
+            print("   Option 1: Kaggle UpdatedResumeDataSet.csv")
+            print("      → Placez dans: backend/data/UpdatedResumeDataSet.csv")
+            print("      → Exécutez: python parse_kaggle_resumes.py")
+            print("   Option 2: ESCO complet")
+            print("      → Téléchargez: https://esco.ec.europa.eu/en/use-esco/download")
+            self._load_from_json(esco_sample)
+        
+        # 7. Aucun dataset trouvé
         else:
-            print("❌ Aucun dataset ESCO trouvé")
-            print("   Téléchargez depuis: https://esco.ec.europa.eu/en/use-esco/download")
+            print("❌ Aucun dataset trouvé")
+            print("   📥 Options:")
+            print("   1. Dataset Kaggle (recommandé)")
+            print("   2. Dataset ESCO officiel")
+            print("   3. Exécuter: python download_esco_complete.py")
             self._load_default_skills()
     
     def _load_from_csv(self, csv_path: Path):
