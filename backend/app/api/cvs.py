@@ -9,7 +9,7 @@ from ..models.cv import CV
 from ..schemas.cv import CVResponse, CVUploadResponse, CVExtractedData, CVUpdateData
 from ..core.deps import get_current_user
 from ..config import settings
-from ..services.cv_extractor_v2 import CVExtractorV2
+from ..services.cv_extractor_v3 import CVExtractorV3
 
 router = APIRouter(prefix="/api/cvs", tags=["CVs"])
 
@@ -57,8 +57,8 @@ async def upload_cv(
     with open(file_path, "wb") as f:
         f.write(contents)
     
-    # Extract data from CV using V2 extractor (robust)
-    extractor = CVExtractorV2()
+    # Extract data from CV using V3 extractor (Kaggle + ESCO + Advanced)
+    extractor = CVExtractorV3()
     extracted_raw = extractor.extract_from_file(file_path)
     
     # Map to expected format for database and response
