@@ -175,3 +175,4 @@ Réduire au maximum le temps de **correction manuelle** par l'utilisateur en pr�
 **Dernière mise à jour :** 20/11/2024
 **Version :** 2.0 (Extraction améliorée)
 
+

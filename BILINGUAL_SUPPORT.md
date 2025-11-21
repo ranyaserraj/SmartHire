@@ -259,3 +259,4 @@ Cela rend l'application **plus polyvalente** et adaptée aux candidats internati
 **Dernière mise à jour :** 20/11/2024  
 **Langues supportées :** Français 🇫🇷 | Anglais 🇬🇧
 
+

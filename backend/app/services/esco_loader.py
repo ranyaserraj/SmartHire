@@ -29,77 +29,37 @@ class ESCOLoader:
         self._load_esco_data()
     
     def _load_esco_data(self):
-        """Charge les données ESCO depuis le fichier local"""
+        """Charge les données depuis le fichier local"""
         # Chemin vers les données
         data_dir = Path(__file__).parent.parent.parent / "data"
         
-        # Ordre de priorité des datasets
+        # Datasets disponibles (par ordre de priorité)
         resume_complete_fr = data_dir / "resume_skills_complete_fr.json"
         resume_complete = data_dir / "resume_skills_complete.json"
-        kaggle_dataset = data_dir / "kaggle_skills.json"
-        esco_complete = data_dir / "esco_skills_complete.json"
-        esco_extended = data_dir / "esco_skills_extended.json"
-        esco_full_csv = data_dir / "esco_skills_full.csv"
-        esco_full_json = data_dir / "esco_skills_full.json"
-        esco_sample = data_dir / "esco_skills_sample.json"
         
-        # 1. Priorité ABSOLUE: Dataset en FRANÇAIS (Multi-domaines)
+        # 1. Priorité ABSOLUE: Dataset en FRANÇAIS (2795 compétences)
         if resume_complete_fr.exists():
-            print("🎯 Chargement du dataset Multi-domaines FRANÇAIS (MEILLEUR)...")
+            print("🎯 Chargement du dataset Multi-domaines FRANÇAIS...")
+            print("   Source: 9544 CV réels, tous secteurs")
             self._load_from_json(resume_complete_fr)
         
         # 2. Dataset anglais (fallback si pas de version FR)
         elif resume_complete.exists():
             print("🎯 Chargement du dataset Multi-domaines (anglais)...")
+            print("   ⚠️  Pensez à traduire: python translate_skills_to_french.py")
             self._load_from_json(resume_complete)
         
-        # 3. Dataset Kaggle IT (CV réels IT seulement)
-        elif kaggle_dataset.exists():
-            print("🎯 Chargement du dataset Kaggle (CV IT uniquement)...")
-            self._load_from_json(kaggle_dataset)
-        
-        # 4. Dataset ESCO complet fusionné
-        elif esco_complete.exists():
-            print("📚 Chargement du dataset ESCO complet...")
-            self._load_from_json(esco_complete)
-        
-        # 5. Dataset étendu avec compétences populaires
-        elif esco_extended.exists():
-            print("📚 Chargement du dataset étendu...")
-            self._load_from_json(esco_extended)
-        
-        # 6. CSV ESCO officiel
-        elif esco_full_csv.exists():
-            print("📚 Chargement du CSV ESCO...")
-            self._load_from_csv(esco_full_csv)
-        
-        # 7. JSON ESCO parsé
-        elif esco_full_json.exists():
-            print("📚 Chargement du JSON ESCO...")
-            self._load_from_json(esco_full_json)
-        
-        # 8. Échantillon (fallback)
-        elif esco_sample.exists():
-            print("⚠️ Utilisation du dataset d'échantillon (limité à 139 compétences)")
-            print("   📥 Pour améliorer (RECOMMANDÉ):")
-            print("   Option 1: Dataset resume_data.csv (MEILLEUR - Multi-domaines)")
-            print("      → Téléchargez depuis Kaggle: resume_data.csv")
-            print("      → Placez dans: backend/data/resume_data.csv")
-            print("      → Exécutez: python parse_resume_data.py")
-            print("      → Puis: python translate_skills_to_french.py")
-            print("   Option 2: Kaggle UpdatedResumeDataSet.csv (IT seulement)")
-            print("      → Placez dans: backend/data/UpdatedResumeDataSet.csv")
-            print("      → Exécutez: python parse_kaggle_resumes.py")
-            self._load_from_json(esco_sample)
-        
-        # 9. Aucun dataset trouvé
+        # 3. Aucun dataset trouvé
         else:
             print("❌ Aucun dataset trouvé")
-            print("   📥 Recommandation:")
-            print("   1. Dataset resume_data.csv (MEILLEUR - Multi-domaines FR)")
-            print("   2. Dataset Kaggle UpdatedResumeDataSet.csv")
-            print("   3. Dataset ESCO officiel")
-            print("   4. Exécuter: python download_esco_complete.py")
+            print()
+            print("📥 Pour créer le dataset:")
+            print("   1. Téléchargez resume_data.csv depuis Kaggle")
+            print("   2. Placez dans: backend/data/resume_data.csv")
+            print("   3. Exécutez: python parse_resume_data.py")
+            print("   4. Traduisez: python translate_skills_to_french.py")
+            print("   5. Redémarrez le serveur")
+            print()
             self._load_default_skills()
     
     def _load_from_csv(self, csv_path: Path):

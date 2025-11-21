@@ -17,7 +17,7 @@ Améliorations V3:
 import re
 import io
 import json
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Set
 from datetime import datetime
 from pathlib import Path
 from collections import defaultdict
