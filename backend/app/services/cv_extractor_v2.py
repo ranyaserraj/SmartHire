@@ -278,18 +278,28 @@ class CVExtractorV2:
     def _extract_phone(self, text: str) -> str:
         """Extraction de téléphone multi-format"""
         patterns = [
-            r'\+?\d{1,3}[\s.-]?\(?\d{1,4}\)?[\s.-]?\d{1,4}[\s.-]?\d{1,4}[\s.-]?\d{1,9}',
-            r'\d{10}',
-            r'\d{2}[\s.-]\d{2}[\s.-]\d{2}[\s.-]\d{2}[\s.-]\d{2}',
+            # Format international : +XXX XXX XXX XXX
+            r'\+\d{1,3}[\s.-]?\d{1,3}[\s.-]?\d{3,4}[\s.-]?\d{3,4}',
+            # Format avec parenthèses : +XXX (XXX) XXX-XXXX
+            r'\+?\d{1,3}[\s.-]?\(?\d{2,3}\)?[\s.-]?\d{3}[\s.-]?\d{4}',
+            # Format standard : XXX-XXX-XXXX ou XXX.XXX.XXXX
+            r'\d{3}[\s.-]\d{3}[\s.-]\d{4}',
+            # Format marocain : 06XX XX XX XX ou +212 6XX XX XX XX
+            r'(?:\+212|0)[5-7]\d{8}|(?:\+212|0)[5-7](?:[\s.-]?\d{2}){4}',
+            # Format simple : 10 chiffres d'affilée
+            r'\b\d{10}\b',
         ]
         
         for pattern in patterns:
             matches = re.findall(pattern, text)
-            if matches:
-                # Nettoyer et valider
-                phone = re.sub(r'[^\d+]', '', matches[0])
-                if 8 <= len(phone) <= 15:
-                    return matches[0]
+            for match in matches:
+                # Nettoyer
+                phone_clean = re.sub(r'[^\d+]', '', match)
+                # Valider la longueur
+                if 9 <= len(phone_clean) <= 15:
+                    # Éviter les numéros qui ressemblent à des dates ou codes postaux
+                    if not re.match(r'^(19|20)\d{2}', match):  # Pas une année
+                        return match.strip()
         return ""
     
     def _extract_city(self, text: str) -> str:
@@ -350,35 +360,94 @@ class CVExtractorV2:
         """Extraction de compétences avec fuzzy matching"""
         skills_found = set()
         
-        # Texte à analyser : section compétences + texte complet
-        search_text = ' '.join(section_lines) + ' ' + text
-        search_text_lower = search_text.lower()
+        # Mots à exclure (stopwords étendus)
+        excluded_words = {
+            # Mots communs anglais
+            'the', 'and', 'for', 'with', 'from', 'this', 'that', 'these', 'those',
+            'any', 'some', 'all', 'each', 'every', 'both', 'few', 'many', 'most',
+            'other', 'such', 'only', 'own', 'same', 'than', 'too', 'very', 'can',
+            'will', 'just', 'should', 'now', 'also', 'well', 'back', 'through',
+            'where', 'much', 'before', 'after', 'here', 'there', 'when', 'how',
+            'about', 'against', 'between', 'into', 'during', 'without', 'again',
+            # Mots communs CV
+            'profile', 'summary', 'work', 'experience', 'education', 'skills',
+            'professional', 'relevant', 'interest', 'bachelor', 'master', 'degree',
+            'university', 'college', 'school', 'year', 'month', 'date', 'city',
+            'state', 'country', 'street', 'phone', 'email', 'address', 'contact',
+            'assistant', 'manager', 'director', 'lead', 'senior', 'junior',
+            'intern', 'coordinator', 'specialist', 'analyst', 'developer',
+            'engineer', 'designer', 'consultant', 'supervisor', 'executive',
+            # Mots français
+            'profil', 'résumé', 'expérience', 'formation', 'compétences',
+            'professionnelle', 'personnelle', 'année', 'mois', 'ville', 'pays',
+            # Noms propres courants (à éviter)
+            'january', 'february', 'march', 'april', 'may', 'june', 'july',
+            'august', 'september', 'october', 'november', 'december',
+            'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
+            # Verbes d'action CV
+            'managed', 'developed', 'created', 'designed', 'implemented', 'led',
+            'coordinated', 'supervised', 'trained', 'analyzed', 'improved',
+            'increased', 'decreased', 'achieved', 'completed', 'delivered',
+            'ensured', 'maintained', 'supported', 'assisted', 'helped',
+            'collaborated', 'worked', 'built', 'established', 'launched',
+            'championed', 'propel', 'proven', 'highly', 'qualified',
+            # Mots génériques
+            'using', 'while', 'within', 'including', 'based', 'related',
+            'various', 'multiple', 'several', 'different', 'specific',
+            'general', 'overall', 'total', 'main', 'key', 'core', 'primary',
+            # Acronymes de sections CV
+            'st', 'rd', 'th', 'ave', 'blvd', 'apt', 'ste',
+            # Autres
+            'client', 'clients', 'company', 'companies', 'team', 'teams',
+            'project', 'projects', 'program', 'programs', 'initiative', 'initiatives',
+            'campaign', 'campaigns', 'event', 'events', 'task', 'tasks',
+            'goal', 'goals', 'objective', 'objectives', 'strategy', 'strategies',
+            'plan', 'plans', 'report', 'reports', 'document', 'documents',
+            'presentation', 'presentations', 'meeting', 'meetings',
+            'brochures', 'brochure', 'postcards', 'postcard', 'newsletter',
+            'newsletters', 'press', 'release', 'releases', 'health', 'unlimited',
+            'anywhere', 'everywhere', 'someone', 'something', 'anything',
+        }
         
-        # 1. Matching exact et fuzzy sur compétences techniques
+        # Texte à analyser : priorité à la section compétences
+        section_text = ' '.join(section_lines)
+        section_text_lower = section_text.lower()
+        
+        # Texte complet pour fallback
+        full_text_lower = text.lower()
+        
+        # 1. Matching exact sur compétences techniques (dans section ET texte complet)
         for skill in self.tech_skills_base:
-            # Exact match
-            if re.search(r'\b' + re.escape(skill.lower()) + r'\b', search_text_lower):
+            # Chercher d'abord dans la section compétences
+            if re.search(r'\b' + re.escape(skill.lower()) + r'\b', section_text_lower):
                 skills_found.add(skill.title())
-                continue
+            # Sinon dans le texte complet
+            elif re.search(r'\b' + re.escape(skill.lower()) + r'\b', full_text_lower):
+                skills_found.add(skill.title())
+        
+        # 2. Extraction des acronymes et mots techniques UNIQUEMENT depuis la section compétences
+        if section_lines:
+            # Pattern pour acronymes techniques (2-15 caractères)
+            tech_pattern = r'\b[A-Z][A-Za-z0-9\+\#\.]{1,14}\b'
+            potential_skills = re.findall(tech_pattern, section_text)
             
-            # Fuzzy match (score > 85)
-            matches = process.extract(skill, search_text.split(), scorer=fuzz.ratio, limit=3)
-            for match, score, index in matches:
-                if score > 85:
-                    skills_found.add(skill.title())
-                    break
+            for skill in potential_skills:
+                skill_lower = skill.lower()
+                # Filtres stricts
+                if (
+                    skill_lower not in excluded_words and  # Pas dans les mots exclus
+                    len(skill) >= 2 and  # Au moins 2 caractères
+                    not skill.isdigit() and  # Pas un nombre
+                    not re.match(r'^\d+$', skill) and  # Pas que des chiffres
+                    not re.match(r'^[A-Z][a-z]+$', skill)  # Pas un mot normal (ex: "Lead", "Manager")
+                ):
+                    # Accepter uniquement les acronymes (tout en majuscules) ou avec caractères spéciaux
+                    if skill.isupper() or any(c in skill for c in ['+', '#', '.', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9']):
+                        skills_found.add(skill)
         
-        # 2. Extraction des acronymes et mots techniques (2-15 caractères, contenant des lettres)
-        tech_pattern = r'\b[A-Z][A-Za-z0-9\+\#\.]{1,14}\b'
-        potential_skills = re.findall(tech_pattern, search_text)
-        for skill in potential_skills:
-            # Vérifier si c'est vraiment une compétence (pas un mot commun)
-            if skill.lower() not in ['the', 'and', 'for', 'with', 'from', 'this']:
-                skills_found.add(skill)
-        
-        # 3. Soft skills
+        # 3. Soft skills (uniquement si mentionnés explicitement)
         for skill in self.soft_skills:
-            if skill.lower() in search_text_lower:
+            if skill.lower() in section_text_lower or skill.lower() in full_text_lower:
                 skills_found.add(skill.title())
         
         return sorted(list(skills_found))
